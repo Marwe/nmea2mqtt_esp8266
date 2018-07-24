@@ -6,40 +6,67 @@ https://github.com/mikalhart/TinyGPSPlus/blob/master/examples/FullExample/FullEx
 #include <SoftwareSerial.h>
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
+#define strcpyDef(var, def) if (def != NULL) { strcpy(var, def); }
 // The TinyGPS++ object
 TinyGPSPlus gps;
-
-
 
 // **** CONFIG SECTION BEGIN
 
 // ****Variables
-const char* ssid = "freifunk.karlsruhe.de";
-const char* password = "";
-const char* mqtt_server = "mqtt.machen.click";
+// configure your credentials and server in
+#include "wificredentials.h";
 
 static const int RXPin = 4, TXPin = 3;
 static const uint32_t GPSBaud = 4800;
 
 
-// **** custom messages you are interested in
+// **** custom messages you are interested in, need to be handled in loop
 TinyGPSCustom WindDirection(gps, "WIMWV", 1);
 TinyGPSCustom WindSpeed(gps, "WIMWV", 3);
 
-
 // **** CONFIG SECTION END
 
-WiFiClient wifiClient;
-PubSubClient psclient(mqtt_server, 1883, callback, wifiClient);
-long lastpsmsg = 0;
-char psmsg[50];
-float psvalue = 0;
+// credentials from wificredentials
+char wlanssid[] = MY_WLANSSID;
+char wlanpwd[] = MY_WLANPWD;
+char mqtt_server[] = MY_MQTT_SERVER;
 
 
 // The serial connection to the GPS device
 SoftwareSerial ss(RXPin, TXPin);
-
 String clientName;
+WiFiClient wifiClient;
+//long lastpsmsg = 0;
+char psmsg[50];
+//float psvalue = 0;
+
+// incoming messages
+void callback(char* topic, byte* payload, unsigned int length) {
+
+/*
+// no handling of incoming messages yet
+  Serial.print("Message arrived [");
+  Serial.print(topic);
+  Serial.print("] ");
+  for (int i = 0; i < length; i++) {
+    Serial.print((char)payload[i]);
+  }
+  Serial.println();
+
+  // Switch on the LED if an 1 was received as first character
+  if ((char)payload[0] == '1') {
+    digitalWrite(BUILTIN_LED, LOW);   // Turn the LED on (Note that LOW is the voltage level
+    // but actually the LED is on; this is because
+    // it is acive low on the ESP-01)
+  } else {
+    digitalWrite(BUILTIN_LED, HIGH);  // Turn the LED off by making the voltage HIGH
+  }
+*/
+}
+
+PubSubClient psclient(mqtt_server, 1883, callback, wifiClient);
+
+
 
 
 void setup()
@@ -67,22 +94,21 @@ void setup()
 
 void loop()
 {
-  String tmptopic;
-  String topic = "nmea2mqtt/";
-  topic += clientName;
-  topic += "/";
-  if (!client.connected()) {
+  String topic;
+  String topicbase = "nmea2mqtt/";
+  topicbase += clientName;
+  topicbase += "/";
+  if (!psclient.connected()) {
     reconnect();
   }
   smartDelay(50);
 
-  tmptopic=topic+String("debug");
-  client.publish(tmptopic.c_str(), msg);
-  client.loop();
+  topic=topicbase+String("debug");
+  psclient.publish(topic.c_str(), "loop");
+  psclient.loop();
   if (WindDirection.isUpdated()){
-    topic
-    client.publish(topic, WindDirection.value());
-
+    topic=topicbase+String("winddirection");
+    psclient.publish(topic.c_str(), WindDirection.value());
   }
 
 
@@ -94,9 +120,9 @@ void setup_wifi() {
   // We start by connecting to a WiFi network
   Serial.println();
   Serial.print("Connecting to ");
-  Serial.println(ssid);
+  Serial.println(wlanssid);
 
-  WiFi.begin(ssid, password);
+  WiFi.begin(wlanssid, wlanpwd);
 
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
@@ -109,25 +135,6 @@ void setup_wifi() {
   Serial.println("WiFi connected");
   Serial.println("IP address: ");
   Serial.println(WiFi.localIP());
-}
-
-void callback(char* topic, byte* payload, unsigned int length) {
-  Serial.print("Message arrived [");
-  Serial.print(topic);
-  Serial.print("] ");
-  for (int i = 0; i < length; i++) {
-    Serial.print((char)payload[i]);
-  }
-  Serial.println();
-
-  // Switch on the LED if an 1 was received as first character
-  if ((char)payload[0] == '1') {
-    digitalWrite(BUILTIN_LED, LOW);   // Turn the LED on (Note that LOW is the voltage level
-    // but actually the LED is on; this is because
-    // it is acive low on the ESP-01)
-  } else {
-    digitalWrite(BUILTIN_LED, HIGH);  // Turn the LED off by making the voltage HIGH
-  }
 }
 
 void reconnect() {
@@ -167,10 +174,12 @@ static void smartDelay(unsigned long ms)
 }
 
 
-static void publishMsg(topic, )
+/*
+static void publishMsg(topic, str)
 {
   int slen = strlen(str);
   for (int i=0; i<len; ++i)
     Serial.print(i<slen ? str[i] : ' ');
   smartDelay(0);
 }
+*/
